@@ -1,7 +1,11 @@
+import fft.AngularSpectrumMethod;
 import fft.Complex;
 import fft.FFT;
 import terminal.Color;
 import terminal.TerminalDisplay;
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 
 public static void main(String[] args) {
     System.out.println("hiya!");
@@ -13,9 +17,15 @@ public static void main(String[] args) {
     var colorData = display.colorData;
     colorData[10 * extentX + 10] = new Color(255, 0, 0);
 
-    testFFT();
+//    testFFT();
+//
+//    testFFT2D();
+    try {
 
-    testFFT2D();
+        angularSpectrumTest();
+    } catch (IOException e) {
+        throw new RuntimeException(e);
+    }
 }
 
 private static void testFFT() {
@@ -68,7 +78,7 @@ private static void testFFT2D() {
 //                    (column - centerColumn) * (column - centerColumn)
 //                    > passRadius * passRadius)
 //                data[row * columns + column] = new Complex(0.0, 0.0);
-    
+
     FFT.fft2D(data, rows, columns);
     final var fftDuration = System.nanoTime() - start;
     System.out.println("Calculations took " + ((double) fftDuration / 1_000_000.0) + " ms");
@@ -101,4 +111,81 @@ private static void testFFT2D() {
         }
 
     display.update();
+}
+
+private static void angularSpectrumTest() throws IOException {
+    final var extentX = 1024;
+    final var extentY = 1024;
+
+    final var wavelength = 543e-9;
+    final var physicalExtentX = 5.6e-3;
+    final var physicalExtentY = 5.6e-3;
+    final var distance = 0.8;
+
+    final var amplitudeMask = new double[extentX * extentY];
+
+    final var amplitudeMaskFile = new File("hexagon_1024.png");
+    final var amplitudeMaskImage = ImageIO.read(amplitudeMaskFile);
+    final var amplitudeMaskImageWidth = amplitudeMaskImage.getWidth();
+    final var amplitudeMaskImageHeight = amplitudeMaskImage.getHeight();
+    if (amplitudeMaskImageWidth != extentX || amplitudeMaskImageHeight != extentY)
+        throw new IllegalStateException();
+
+    for (var y = 0; y < extentY; y++)
+        for (var x = 0; x < extentX; x++) {
+            final var whiteThreshold = 250;
+
+            final var argb = amplitudeMaskImage.getRGB(x, y);
+            final var alpha = (argb >>> 24) & 0xFF;
+            final var red = (argb >>> 16) & 0xFF;
+            final var green = (argb >>> 8) & 0xFF;
+            final var blue = argb & 0xFF;
+
+            final var isWhite = alpha > 0 &&
+                    red >= whiteThreshold &&
+                    green >= whiteThreshold &&
+                    blue >= whiteThreshold;
+            if (isWhite) amplitudeMask[y * extentX + x] = 1.0;
+        }
+
+    final var incidentIntensity = new double[extentX * extentY];
+    Arrays.fill(incidentIntensity, 1.0);
+
+    final var observation = AngularSpectrumMethod.process(
+            wavelength,
+            physicalExtentX, physicalExtentY,
+            distance,
+            extentX, extentY,
+            amplitudeMask,
+            incidentIntensity
+    );
+
+    outputModulusVisualization("test.png", observation, extentX, extentY);
+}
+
+private static void outputModulusVisualization(
+        String path,
+        Complex[] data,
+        int width,
+        int height
+) {
+    double reference = 0.0;
+    for (Complex complex : data) reference = Math.max(reference, complex.modulus());
+    if (reference == 0.0) reference = 1.0;
+   
+    System.out.println("peak " + reference);
+
+    final var image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+    for (var y = 0; y < height; y++)
+        for (var x = 0; x < width; x++) {
+            final var modulus = data[y * width + x].modulus();
+            final var color = (int) (modulus / reference * 255.0);
+            image.setRGB(x, y, (0xFF << 24) | (color << 16) | (color << 8) | color);
+        }
+
+    try {
+        ImageIO.write(image, "png", new File(path));
+    } catch (IOException e) {
+        throw new RuntimeException(e);
+    }
 }

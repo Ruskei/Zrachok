@@ -34,4 +34,8 @@ public value record Complex(double real, double imaginary) {
     public double modulus() {
         return Math.sqrt(real * real + imaginary * imaginary);
     }
+    
+    public Complex conjugate() {
+        return new Complex(real, -imaginary);
+    }
 }

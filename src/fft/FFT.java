@@ -44,19 +44,29 @@ public class FFT {
     /**
      * Does in-place transformation of data at an offset, with a specified stride
      * between the values it operates on.
+     * <p>
+     * DFT of
+     * c_k = sum_j y_j e^(2 pi i j k / n)
+     * <p>
+     * Does not perform normalization
      *
      * @param data
      * @param offset
      * @param stride
      * @param length
      */
-    private static void rawFFT(final Complex[] data, final int offset, final int stride, final int length) {
+    private static void rawFFT(
+            final Complex[] data,
+            final int offset,
+            final int stride,
+            final int length
+    ) {
         if (length == 1) return;
         if (!Math.isPowerOfTwo(length)) throw new IllegalArgumentException();
 
         for (var chunk = length; chunk >= 2; chunk /= 2) {
             final var half = chunk / 2;
-            final var angle = 2.0 * java.lang.Math.PI / chunk;
+            final var angle = -2.0 * java.lang.Math.PI / chunk;
             final Complex factorStep = new Complex(java.lang.Math.cos(angle), java.lang.Math.sin(angle));
 
             for (var i = 0; i < length; i += chunk) {
@@ -105,10 +115,25 @@ public class FFT {
             rawFFT(data, row * columns, 1, columns);
         for (var column = 0; column < columns; column++)
             rawFFT(data, column, columns, rows);
+    }
 
-        final var normalization = 1.0 / java.lang.Math.sqrt(rows * columns);
-        for (var i = 0; i < data.length; i++)
-            data[i] = data[i].mul(normalization);
+    /**
+     * Expects row-major data
+     *
+     * @param data
+     * @param rows
+     * @param columns
+     */
+    public static void ifft2D(Complex[] data, int rows, int columns) {
+        final var numPoints = rows * columns;
+        for (var i = 0; i < numPoints; i++)
+            data[i] = data[i].conjugate();
+
+        fft2D(data, rows, columns);
+
+        final var normalization = 1.0 / numPoints;
+        for (var i = 0; i < numPoints; i++)
+            data[i] = data[i].mul(normalization).conjugate();
     }
 
     public static void shiftCenter(Complex[] data, int rows, int columns) {
