@@ -4,6 +4,7 @@ import java.awt.*;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
 
@@ -28,8 +29,9 @@ public class CIE {
         while (scanner.hasNextLine()) {
             final var line = scanner.nextLine();
             final var split = line.split(" ");
-            if (split.length != 4) throw new IllegalStateException();
-            final var wavelength = Double.parseDouble(split[0]);
+            if (split.length != 4)
+                throw new IllegalStateException("Split was: " + Arrays.toString(split));
+            final var wavelength = Double.parseDouble(split[0]) * 1.0e-9;
             final var x = Double.parseDouble(split[1]);
             final var y = Double.parseDouble(split[2]);
             final var z = Double.parseDouble(split[3]);
