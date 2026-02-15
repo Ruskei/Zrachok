@@ -39,10 +39,10 @@ private static void testFFT() {
 }
 
 private static void testFFT2D() {
-    final var rows = 256;
-    final var columns = 256;
+    final var rows = 64;
+    final var columns = 64;
 
-    final var circleRadius = 48;
+    final var circleRadius = 12;
     final var centerRow = rows / 2;
     final var centerColumn = columns / 2;
 
@@ -59,8 +59,20 @@ private static void testFFT2D() {
     final var start = System.nanoTime();
     FFT.fft2D(data, rows, columns);
     FFT.shiftCenter(data, rows, columns);
+
+    // frequency messing
+//    var passRadius = 8;
+//    for (var row = 0; row < rows; row++)
+//        for (var column = 0; column < columns; column++)
+//            if ((row - centerRow) * (row - centerRow) +
+//                    (column - centerColumn) * (column - centerColumn)
+//                    > passRadius * passRadius)
+//                data[row * columns + column] = new Complex(0.0, 0.0);
+    
+    FFT.fft2D(data, rows, columns);
     final var fftDuration = System.nanoTime() - start;
-    System.out.println("FFT took " + ((double) fftDuration / 1_000_000.0) + " ms");
+    System.out.println("Calculations took " + ((double) fftDuration / 1_000_000.0) + " ms");
+
     final var display = new TerminalDisplay(rows, columns);
     final var colorData = display.colorData;
 
@@ -68,15 +80,23 @@ private static void testFFT2D() {
     for (Complex complex : data) ref = Math.max(ref, complex.modulus());
     if (ref == 0.0) ref = 1.0;
 
-    double floorDb = -80.0;
+    // show with different scaling that makes smaller differences more visible
+//    double floorDb = -80.0;
+//    for (int r = 0; r < rows; r++)
+//        for (int c = 0; c < columns; c++) {
+//            double m = data[r * columns + c].modulus();
+//            double db = 20.0 * Math.log10((m + 1e-12) / ref);
+//            double t = (db - floorDb) / (0.0 - floorDb);
+//            t = Math.clamp(t, 0.0, 1.0);
+//            int g = (int) Math.round(t * 255.0);
+//            colorData[r * columns + c] = new Color(g, g, g);
+//        }
 
+    // linear
     for (int r = 0; r < rows; r++)
         for (int c = 0; c < columns; c++) {
             double m = data[r * columns + c].modulus();
-            double db = 20.0 * Math.log10((m + 1e-12) / ref);
-            double t = (db - floorDb) / (0.0 - floorDb);
-            t = Math.clamp(t, 0.0, 1.0);
-            int g = (int) Math.round(t * 255.0);
+            int g = (int) Math.round(m / ref * 255.0);
             colorData[r * columns + c] = new Color(g, g, g);
         }
 

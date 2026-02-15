@@ -15,6 +15,10 @@ public value record Complex(double real, double imaginary) {
         );
     }
 
+    public Complex mul(double real) {
+        return new Complex(this.real * real, this.imaginary * real);
+    }
+
     public Complex divByReal(double real) {
         return new Complex(this.real / real, this.imaginary / real);
     }

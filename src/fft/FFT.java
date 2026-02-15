@@ -105,6 +105,10 @@ public class FFT {
             rawFFT(data, row * columns, 1, columns);
         for (var column = 0; column < columns; column++)
             rawFFT(data, column, columns, rows);
+
+        final var normalization = 1.0 / java.lang.Math.sqrt(rows * columns);
+        for (var i = 0; i < data.length; i++)
+            data[i] = data[i].mul(normalization);
     }
 
     public static void shiftCenter(Complex[] data, int rows, int columns) {
