@@ -26,15 +26,15 @@ public class AngularSpectrumMethod {
             double[] amplitudeMask,
             double[] incidentIntensity
     ) {
-        final var numPoints = resolutionX * resolutionY;
+        final int numPoints = resolutionX * resolutionY;
 
         if (amplitudeMask.length != numPoints)
             throw new IllegalArgumentException("Amplitude mask size does not match expected resolution");
         if (incidentIntensity.length != numPoints)
             throw new IllegalArgumentException("Incident field intensity size does not match expected resolution");
 
-        final var incidentField = new Complex[numPoints];
-        for (var i = 0; i < numPoints; i++)
+        final Complex[] incidentField = new Complex[numPoints];
+        for (int i = 0; i < numPoints; i++)
             incidentField[i] = new Complex(amplitudeMask[i] * incidentIntensity[i], 0);
 
         /*
@@ -63,14 +63,14 @@ public class AngularSpectrumMethod {
           our DFT form
          */
 
-        final var incidentFieldSpectrum = new Complex[numPoints];
-        System.arraycopy(incidentField, 0, incidentFieldSpectrum, 0, numPoints);
-
-        FFT.fft2D(incidentFieldSpectrum, resolutionY, resolutionX);
+//        final Complex[] incidentFieldSpectrum = new Complex[numPoints];
+//        System.arraycopy(incidentField, 0, incidentFieldSpectrum, 0, numPoints);
+//
+        FFT.fft2D(incidentField, resolutionY, resolutionX);
         /*
         shift because x'_s_x = -L + s_x (2 L_x) / N_x
          */
-        FFT.shiftCenter(incidentFieldSpectrum, resolutionY, resolutionX);
+        FFT.shiftCenter(incidentField, resolutionY, resolutionX);
 
         /*
         now to obtain U(x, y, -L), where L is distance to the observation
@@ -85,29 +85,26 @@ public class AngularSpectrumMethod {
         IFFT like normal
          */
 
-        final var observationField = new Complex[numPoints];
-        System.arraycopy(incidentFieldSpectrum, 0, observationField, 0, numPoints);
-
-        for (var y = 0; y < resolutionY; y++)
-            for (var x = 0; x < resolutionX; x++) {
-                final var shiftedX = x - resolutionX / 2;
-                final var shiftedY = y - resolutionY / 2;
-                final var pi = java.lang.Math.PI;
-                final var frequencyZ = Math.sqrt(
+        for (int y = 0; y < resolutionY; y++)
+            for (int x = 0; x < resolutionX; x++) {
+                final int shiftedX = x - resolutionX / 2;
+                final int shiftedY = y - resolutionY / 2;
+                final double pi = java.lang.Math.PI;
+                final double frequencyZ = Math.sqrt(
                         (4.0 * pi * pi) / wavelength / wavelength -
                                 pi * pi * shiftedX * shiftedX / extentX / extentX -
                                 pi * pi * shiftedY * shiftedY / extentY / extentY
                 );
-                final var angle = frequencyZ * distance;
-                final var factor = new Complex(Math.cos(angle), Math.sin(angle));
-                observationField[y * resolutionX + x] =
-                        observationField[y * resolutionX + x]
+                final double angle = frequencyZ * distance;
+                final Complex factor = new Complex(Math.cos(angle), Math.sin(angle));
+                incidentField[y * resolutionX + x] =
+                        incidentField[y * resolutionX + x]
                                 .mul(factor);
             }
 
-        FFT.shiftCenter(observationField, resolutionY, resolutionX);
-        FFT.ifft2D(observationField, resolutionY, resolutionX);
+        FFT.shiftCenter(incidentField, resolutionY, resolutionX);
+        FFT.ifft2D(incidentField, resolutionY, resolutionX);
 
-        return observationField;
+        return incidentField;
     }
 }

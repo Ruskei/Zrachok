@@ -1,298 +1,134 @@
 import color.CIE;
 import color.PolychromaticLight;
 import fft.AngularSpectrumMethod;
-import fft.Complex;
-import fft.FFT;
-import terminal.Color;
-import terminal.TerminalDisplay;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
-public static void main(String[] args) throws IOException {
-    System.out.println("hiya!");
-
-    final int extentX = 30;
-    final int extentY = 30;
-
-    var display = new TerminalDisplay(extentX, extentY);
-    var colorData = display.colorData;
-    colorData[10 * extentX + 10] = new Color(255, 0, 0);
-
-//    testFFT();
-//
-//    testFFT2D();
-    try {
-        angularSpectrumTest();
-    } catch (IOException e) {
-        throw new RuntimeException(e);
-    }
-
-    angularSpectrumPolychromaticTest();
-}
-
-private static void testFFT() {
-    final var data = new Complex[]{
-            new Complex(1),
-            new Complex(-1),
-            new Complex(1),
-            new Complex(-1),
-            new Complex(5),
-            new Complex(4),
-            new Complex(3),
-            new Complex(2),
-    };
-
-    final var normalization = Math.sqrt(data.length);
-
-    FFT.fft(data);
-
-    for (var c : data)
-        System.out.println(c.divByReal(normalization));
-}
-
-private static void testFFT2D() {
-    final var rows = 64;
-    final var columns = 64;
-
-    final var circleRadius = 12;
-    final var centerRow = rows / 2;
-    final var centerColumn = columns / 2;
-
-    final var data = new Complex[rows * columns];
-    for (var row = 0; row < rows; row++)
-        for (var column = 0; column < columns; column++)
-            if ((row - centerRow) * (row - centerRow) +
-                    (column - centerColumn) * (column - centerColumn)
-                    < circleRadius * circleRadius)
-                data[row * columns + column] = new Complex(1.0);
-            else
-                data[row * columns + column] = new Complex(0.0);
-
-    final var start = System.nanoTime();
-    FFT.fft2D(data, rows, columns);
-    FFT.shiftCenter(data, rows, columns);
-
-    // frequency messing
-//    var passRadius = 8;
-//    for (var row = 0; row < rows; row++)
-//        for (var column = 0; column < columns; column++)
-//            if ((row - centerRow) * (row - centerRow) +
-//                    (column - centerColumn) * (column - centerColumn)
-//                    > passRadius * passRadius)
-//                data[row * columns + column] = new Complex(0.0, 0.0);
-
-    FFT.fft2D(data, rows, columns);
-    final var fftDuration = System.nanoTime() - start;
-    System.out.println("Calculations took " + ((double) fftDuration / 1_000_000.0) + " ms");
-
-    final var display = new TerminalDisplay(rows, columns);
-    final var colorData = display.colorData;
-
-    double ref = 0.0;
-    for (Complex complex : data) ref = Math.max(ref, complex.modulus());
-    if (ref == 0.0) ref = 1.0;
-
-    // show with different scaling that makes smaller differences more visible
-//    double floorDb = -80.0;
-//    for (int r = 0; r < rows; r++)
-//        for (int c = 0; c < columns; c++) {
-//            double m = data[r * columns + c].modulus();
-//            double db = 20.0 * Math.log10((m + 1e-12) / ref);
-//            double t = (db - floorDb) / (0.0 - floorDb);
-//            t = Math.clamp(t, 0.0, 1.0);
-//            int g = (int) Math.round(t * 255.0);
-//            colorData[r * columns + c] = new Color(g, g, g);
-//        }
-
-    // linear
-    for (int r = 0; r < rows; r++)
-        for (int c = 0; c < columns; c++) {
-            double m = data[r * columns + c].modulus();
-            int g = (int) Math.round(m / ref * 255.0);
-            colorData[r * columns + c] = new Color(g, g, g);
-        }
-
-    display.update();
-}
-
-private static void angularSpectrumTest() throws IOException {
-    final var extentX = 1024;
-    final var extentY = 1024;
-
-    final var wavelength = 543e-9;
-    final var physicalExtentX = 5.6e-3;
-    final var physicalExtentY = 5.6e-3;
-    final var distance = 0.8;
-
-    final var amplitudeMask = new double[extentX * extentY];
-
-    final var amplitudeMaskFile = new File("hexagon_1024.png");
-    final var amplitudeMaskImage = ImageIO.read(amplitudeMaskFile);
-    final var amplitudeMaskImageWidth = amplitudeMaskImage.getWidth();
-    final var amplitudeMaskImageHeight = amplitudeMaskImage.getHeight();
-    if (amplitudeMaskImageWidth != extentX || amplitudeMaskImageHeight != extentY)
-        throw new IllegalStateException();
-
-    for (var y = 0; y < extentY; y++)
-        for (var x = 0; x < extentX; x++) {
-            final var whiteThreshold = 250;
-
-            final var argb = amplitudeMaskImage.getRGB(x, y);
-            final var alpha = (argb >>> 24) & 0xFF;
-            final var red = (argb >>> 16) & 0xFF;
-            final var green = (argb >>> 8) & 0xFF;
-            final var blue = argb & 0xFF;
-
-            final var isWhite = alpha > 0 &&
-                    red >= whiteThreshold &&
-                    green >= whiteThreshold &&
-                    blue >= whiteThreshold;
-            if (isWhite) amplitudeMask[y * extentX + x] = 1.0;
-        }
-
-    final var incidentIntensity = new double[extentX * extentY];
-    Arrays.fill(incidentIntensity, 1.0);
-
-    final var observation = AngularSpectrumMethod.process(
-            wavelength,
-            physicalExtentX, physicalExtentY,
-            distance,
-            extentX, extentY,
-            amplitudeMask,
-            incidentIntensity
-    );
-
-    outputModulusVisualization("test.png", observation, extentX, extentY);
-}
-
-private static void angularSpectrumPolychromaticTest() throws IOException {
-    System.out.println("polychromatic test started!");
-    final var extentX = 512;
-    final var extentY = 512;
-
-    final var physicalExtentX = 5.6e-3;
-    final var physicalExtentY = 5.6e-3;
-    final var distance = 0.1;
-
-    final var amplitudeMask = new double[extentX * extentY];
-
-    final var amplitudeMaskFile = new File("candy_cane.png");
-    final var amplitudeMaskImage = ImageIO.read(amplitudeMaskFile);
-    final var amplitudeMaskImageWidth = amplitudeMaskImage.getWidth();
-    final var amplitudeMaskImageHeight = amplitudeMaskImage.getHeight();
-    if (amplitudeMaskImageWidth != extentX || amplitudeMaskImageHeight != extentY)
-        throw new IllegalStateException();
-
-    for (var y = 0; y < extentY; y++)
-        for (var x = 0; x < extentX; x++) {
-            final var whiteThreshold = 250;
-
-            final var argb = amplitudeMaskImage.getRGB(x, y);
-            final var alpha = (argb >>> 24) & 0xFF;
-            final var red = (argb >>> 16) & 0xFF;
-            final var green = (argb >>> 8) & 0xFF;
-            final var blue = argb & 0xFF;
-
-            final var isWhite = alpha > 0 &&
-                    red >= whiteThreshold &&
-                    green >= whiteThreshold &&
-                    blue >= whiteThreshold;
-            if (isWhite) amplitudeMask[y * extentX + x] = 1.0;
-        }
-
-    final var lightData = new ArrayList<MonochromaticData>();
-
-    final var whiteLight = PolychromaticLight.parsePolychromaticData(new File("illuminant_d65.txt"));
-    System.out.println("  " + whiteLight.lightData.size() + " wavelengths");
-    var count = 0;
-    for (var wavelengthWithIntensity : whiteLight.lightData) {
-        final var wavelength = wavelengthWithIntensity.wavelength();
-        final var intensity = wavelengthWithIntensity.intensity();
-
-        final var incidentIntensity = new double[extentX * extentY];
-        Arrays.fill(incidentIntensity, intensity);
-
-        final var observation = AngularSpectrumMethod.process(
-                wavelength,
-                physicalExtentX, physicalExtentY,
-                distance,
-                extentX, extentY,
-                amplitudeMask,
-                incidentIntensity
+public class Main {
+    public static void main(String[] args) throws IOException {
+        long start = System.nanoTime();
+        propagateLight(
+                256, 256,
+                5.6e-3, 5.6e-3,
+                0.8,
+                "triangle_256.png",
+                "triangle_256_propagated.png"
         );
-
-        final var observationIntensity = new double[observation.length];
-        for (var i = 0; i < observation.length; i++)
-            observationIntensity[i] = observation[i].modulus();
-
-        lightData.add(new MonochromaticData(wavelength, observationIntensity));
-
-        if (count % 10 == 0)
-            System.out.println("  finished " + count + "/" + whiteLight.lightData.size());
-        count++;
+        long finish = System.nanoTime();
+        System.out.println("Fully took " + ((double) (finish - start) / 1_000_000.0) + " ms");
     }
 
-    writePhysicalVisualization("cane_polychromatic.png", lightData, extentX, extentY);
-}
+    private static void propagateLight(
+            int extentX, int extentY,
+            double physicalExtentX, double physicalExtentY,
+            double distance,
+            String amplitudeMaskPath,
+            String saveFilePath
+    ) throws IOException {
+        System.out.println("polychromatic test started!");
+        final double[] amplitudeMask = new double[extentX * extentY];
 
-private static void outputModulusVisualization(
-        String path,
-        Complex[] data,
-        int width,
-        int height
-) {
-    double reference = 0.0;
-    for (Complex complex : data) reference = Math.max(reference, complex.modulus());
-    if (reference == 0.0) reference = 1.0;
+        final File amplitudeMaskFile = new File(amplitudeMaskPath);
+        final BufferedImage amplitudeMaskImage = ImageIO.read(amplitudeMaskFile);
+        final int amplitudeMaskImageWidth = amplitudeMaskImage.getWidth();
+        final int amplitudeMaskImageHeight = amplitudeMaskImage.getHeight();
+        if (amplitudeMaskImageWidth != extentX || amplitudeMaskImageHeight != extentY)
+            throw new IllegalStateException();
 
-    System.out.println("peak " + reference);
+        for (int y = 0; y < extentY; y++)
+            for (int x = 0; x < extentX; x++) {
+                final int whiteThreshold = 250;
 
-    final var image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-    for (var y = 0; y < height; y++)
-        for (var x = 0; x < width; x++) {
-            final var modulus = data[y * width + x].modulus();
-            final var color = (int) (modulus / reference * 255.0);
-            image.setRGB(x, y, (0xFF << 24) | (color << 16) | (color << 8) | color);
+                final int argb = amplitudeMaskImage.getRGB(x, y);
+                final int alpha = (argb >>> 24) & 0xFF;
+                final int red = (argb >>> 16) & 0xFF;
+                final int green = (argb >>> 8) & 0xFF;
+                final int blue = argb & 0xFF;
+
+                final boolean isWhite = alpha > 0 &&
+                        red >= whiteThreshold &&
+                        green >= whiteThreshold &&
+                        blue >= whiteThreshold;
+                if (isWhite) amplitudeMask[y * extentX + x] = 1.0;
+            }
+
+        long start = System.nanoTime();
+        final ArrayList<MonochromaticData> lightData = new ArrayList<>();
+
+        final PolychromaticLight whiteLight = PolychromaticLight.parsePolychromaticData(new File("illuminant_d65.txt"));
+        System.out.println("  " + whiteLight.lightData.size() + " wavelengths");
+        int count = 0;
+        for (PolychromaticLight.WavelengthWithIntensity wavelengthWithIntensity : whiteLight.lightData) {
+            final double wavelength = wavelengthWithIntensity.wavelength();
+            final double intensity = wavelengthWithIntensity.intensity();
+
+            final double[] incidentIntensity = new double[extentX * extentY];
+            Arrays.fill(incidentIntensity, intensity);
+
+            final fft.Complex[] observation = AngularSpectrumMethod.process(
+                    wavelength,
+                    physicalExtentX, physicalExtentY,
+                    distance,
+                    extentX, extentY,
+                    amplitudeMask,
+                    incidentIntensity
+            );
+
+            final double[] observationIntensity = new double[observation.length];
+            for (int i = 0; i < observation.length; i++)
+                observationIntensity[i] = observation[i].modulus();
+
+            lightData.add(new MonochromaticData(wavelength, observationIntensity));
+
+            if (count % 10 == 0)
+                System.out.println("  finished " + count + "/" + whiteLight.lightData.size());
+            count++;
         }
 
-    try {
+        long finish = System.nanoTime();
+        long duration = finish - start;
+        System.out.println("Simulation took " + ((double) duration / 1_000_000.0) + "ms");
+
+        writePhysicalVisualization(saveFilePath, lightData, extentX, extentY);
+    }
+
+    private static void writePhysicalVisualization(
+            String path,
+            List<MonochromaticData> colorData,
+            int extentX, int extentY
+    ) throws IOException {
+        final double reflectance = 3.0;
+        final int numPoints = extentX * extentY;
+        for (MonochromaticData data : colorData)
+            if (data.intensities.length != numPoints)
+                throw new IllegalArgumentException();
+
+        final ArrayList<Double> wavelengths = new ArrayList<>();
+        for (MonochromaticData data : colorData)
+            wavelengths.add(data.wavelength);
+
+        final CIE cie = CIE.parseColorData(new File("cie-cmf.txt"));
+
+        final BufferedImage image = new BufferedImage(extentX, extentY, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < extentY; y++)
+            for (int x = 0; x < extentX; x++) {
+                final ArrayList<Double> intensities = new ArrayList<>();
+                for (MonochromaticData data : colorData)
+                    intensities.add(data.intensities[y * extentX + x]);
+                final java.awt.Color color =
+                        cie.calculateColor(wavelengths, intensities, reflectance);
+                image.setRGB(x, y, color.getRGB());
+            }
+
         ImageIO.write(image, "png", new File(path));
-    } catch (IOException e) {
-        throw new RuntimeException(e);
     }
-}
 
-private static void writePhysicalVisualization(
-        String path,
-        List<MonochromaticData> colorData,
-        int extentX, int extentY
-) throws IOException {
-    final var reflectance = 1.0;
-    final var numPoints = extentX * extentY;
-    for (var data : colorData)
-        if (data.intensities.length != numPoints)
-            throw new IllegalArgumentException();
-
-    final var wavelengths = new ArrayList<Double>();
-    for (var data : colorData)
-        wavelengths.add(data.wavelength);
-
-    final var cie = CIE.parseColorData(new File("cie-cmf.txt"));
-
-    final var image = new BufferedImage(extentX, extentY, BufferedImage.TYPE_INT_ARGB);
-    for (var y = 0; y < extentY; y++)
-        for (var x = 0; x < extentX; x++) {
-            final var intensities = new ArrayList<Double>();
-            for (var data : colorData)
-                intensities.add(data.intensities[y * extentX + x]);
-            final var color =
-                    cie.calculateColor(wavelengths, intensities, reflectance);
-            image.setRGB(x, y, color.getRGB());
-        }
-
-    ImageIO.write(image, "png", new File(path));
-}
-
-value record MonochromaticData(double wavelength, double[] intensities) {
+    value record MonochromaticData(double wavelength, double[] intensities) {
+    }
 }

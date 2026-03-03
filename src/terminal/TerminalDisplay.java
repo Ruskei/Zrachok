@@ -37,9 +37,9 @@ public class TerminalDisplay {
 
             for (int y = 0; y < extentY; y++) {
                 for (int x = 0; x < extentX; x++) {
-                    var pixelColor = colorData[y * extentX + x];
+                    Color pixelColor = colorData[y * extentX + x];
                     if (pixelColor != currentColor) {
-                        final var colorStr = "\033[38;2;" +
+                        final String colorStr = "\033[38;2;" +
                                 pixelColor.r() + ";" +
                                 pixelColor.g() + ";" +
                                 pixelColor.b() + "m";

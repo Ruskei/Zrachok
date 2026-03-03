@@ -21,20 +21,20 @@ public class CIE {
     }
 
     public static CIE parseColorData(File file) throws FileNotFoundException {
-        final var scanner = new Scanner(file);
+        final Scanner scanner = new Scanner(file);
         ;
 
-        final var colorMatching = new ArrayList<WavelengthXYZColor>();
+        final ArrayList<WavelengthXYZColor> colorMatching = new ArrayList<>();
 
         while (scanner.hasNextLine()) {
-            final var line = scanner.nextLine();
-            final var split = line.split(" ");
+            final String line = scanner.nextLine();
+            final String[] split = line.split(" ");
             if (split.length != 4)
                 throw new IllegalStateException("Split was: " + Arrays.toString(split));
-            final var wavelength = Double.parseDouble(split[0]) * 1.0e-9;
-            final var x = Double.parseDouble(split[1]);
-            final var y = Double.parseDouble(split[2]);
-            final var z = Double.parseDouble(split[3]);
+            final double wavelength = Double.parseDouble(split[0]) * 1.0e-9;
+            final double x = Double.parseDouble(split[1]);
+            final double y = Double.parseDouble(split[2]);
+            final double z = Double.parseDouble(split[3]);
 
             colorMatching.add(new WavelengthXYZColor(wavelength, x, y, z));
         }
@@ -47,13 +47,13 @@ public class CIE {
     private XYZColor tristimulus(double wavelength) {
         if (colorMatching.isEmpty()) throw new IllegalStateException();
 
-        final var first = colorMatching.getFirst();
-        final var last = colorMatching.getLast();
+        final WavelengthXYZColor first = colorMatching.getFirst();
+        final WavelengthXYZColor last = colorMatching.getLast();
 
         if (wavelength < first.wavelength || wavelength > last.wavelength)
             return new XYZColor(0.0, 0.0, 0.0);
 
-        var index = 0;
+        int index = 0;
         while (index < colorMatching.size()
                 && colorMatching.get(index).wavelength < wavelength) index++;
 
@@ -63,11 +63,11 @@ public class CIE {
                 colorMatching.get(index).z
         );
 
-        final var previous = colorMatching.get(index - 1);
-        final var next = colorMatching.get(index);
-        final var range = next.wavelength - previous.wavelength;
-        final var factorPrevious = range - wavelength;
-        final var factorNext = 1.0 - factorPrevious;
+        final WavelengthXYZColor previous = colorMatching.get(index - 1);
+        final WavelengthXYZColor next = colorMatching.get(index);
+        final double range = next.wavelength - previous.wavelength;
+        final double factorPrevious = range - wavelength;
+        final double factorNext = 1.0 - factorPrevious;
 
         return new XYZColor(
                 factorPrevious * previous.x + factorNext * next.x,
@@ -83,30 +83,30 @@ public class CIE {
     ) {
         if (wavelengths.size() != intensities.size()) throw new IllegalArgumentException();
 
-        var x = 0.0;
-        var y = 0.0;
-        var z = 0.0;
+        double x = 0.0;
+        double y = 0.0;
+        double z = 0.0;
 
-        for (var i = 0; i < wavelengths.size(); i++) {
-            final var wavelength = wavelengths.get(i);
-            final var intensity = intensities.get(i);
-            final var factor = reflectance / Math.PI * intensity;
-            final var stimulus = tristimulus(wavelength);
+        for (int i = 0; i < wavelengths.size(); i++) {
+            final double wavelength = wavelengths.get(i);
+            final double intensity = intensities.get(i);
+            final double factor = reflectance / Math.PI * intensity;
+            final XYZColor stimulus = tristimulus(wavelength);
 
             x += factor * stimulus.x;
             y += factor * stimulus.y;
             z += factor * stimulus.z;
         }
 
-        var linearR = x * xyz2rgb[0] + y * xyz2rgb[1] + z * xyz2rgb[2];
-        var linearG = x * xyz2rgb[3] + y * xyz2rgb[4] + z * xyz2rgb[5];
-        var linearB = x * xyz2rgb[6] + y * xyz2rgb[7] + z * xyz2rgb[8];
+        double linearR = x * xyz2rgb[0] + y * xyz2rgb[1] + z * xyz2rgb[2];
+        double linearG = x * xyz2rgb[3] + y * xyz2rgb[4] + z * xyz2rgb[5];
+        double linearB = x * xyz2rgb[6] + y * xyz2rgb[7] + z * xyz2rgb[8];
 
-        final var magic1 = 0.00304;
-        final var magic2 = 12.92;
-        final var magic3 = 1.055;
-        final var magic4 = 0.42;
-        final var magic5 = 0.055;
+        final double magic1 = 0.00304;
+        final double magic2 = 12.92;
+        final double magic3 = 1.055;
+        final double magic4 = 0.42;
+        final double magic5 = 0.055;
 
         if (linearR <= magic1) linearR *= magic2;
         else linearR = magic3 * Math.pow(linearR, magic4) - magic5;

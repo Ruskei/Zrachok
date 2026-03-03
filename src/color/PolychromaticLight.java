@@ -15,17 +15,17 @@ public class PolychromaticLight {
     }
 
     public static PolychromaticLight parsePolychromaticData(File file) throws FileNotFoundException {
-        final var scanner = new Scanner(file);
+        final Scanner scanner = new Scanner(file);
 
-        final var lightData = new ArrayList<WavelengthWithIntensity>();
+        final ArrayList<WavelengthWithIntensity> lightData = new ArrayList<>();
 
         while (scanner.hasNextLine()) {
-            final var line = scanner.nextLine();
-            final var split = line.split(" ");
+            final String line = scanner.nextLine();
+            final String[] split = line.split(" ");
             if (split.length != 2)
                 throw new IllegalStateException("Split was: " + Arrays.toString(split));
-            final var wavelength = Double.parseDouble(split[0]) * 1.0e-9;
-            final var intensity = Double.parseDouble(split[1]);
+            final double wavelength = Double.parseDouble(split[0]) * 1.0e-9;
+            final double intensity = Double.parseDouble(split[1]);
 
             lightData.add(new WavelengthWithIntensity(wavelength, intensity));
         }
